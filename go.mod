@@ -1,4 +1,4 @@
-module github.com/evanofslack/slog-once
+module github.com/evanofslack/slog-dedupe
 
 go 1.25.1
 

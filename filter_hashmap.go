@@ -1,4 +1,4 @@
-package slogonce
+package slogdedupe
 
 type HashMapFilter struct {
 	seen     map[uint64]struct{}

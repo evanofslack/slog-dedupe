@@ -1,4 +1,4 @@
-package slogonce
+package slogdedupe
 
 import (
 	"testing"

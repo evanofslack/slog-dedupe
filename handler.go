@@ -25,6 +25,8 @@ type Handler struct {
 	window    time.Duration
 	lastReset atomic.Int64
 	mu        sync.RWMutex
+	onKeep    func(context.Context, slog.Record)
+	onDrop    func(context.Context, slog.Record)
 }
 
 type Option func(*Handler)
@@ -41,10 +43,18 @@ func WithWindow(d time.Duration) Option {
 	return func(h *Handler) { h.window = d }
 }
 
-// New creates new dedupe logger middleware
-func New(next slog.Handler, opts ...Option) *Handler {
+func WithOnKeep(hook func(context.Context, slog.Record)) Option {
+	return func(h *Handler) { h.onKeep = hook }
+}
+
+func WithOnDrop(hook func(context.Context, slog.Record)) Option {
+	return func(h *Handler) { h.onDrop = hook }
+}
+
+// NewHandler creates new dedupe logger
+func NewHandler(handler slog.Handler, opts ...Option) *Handler {
 	h := &Handler{
-		next:   next,
+		next:   handler,
 		filter: NewBloomFilter(),
 		hasher: NewDefaultHasher(),
 		window: 5 * time.Second,
@@ -59,7 +69,7 @@ func New(next slog.Handler, opts ...Option) *Handler {
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	now := time.Now().UnixNano()
 	last := h.lastReset.Load()
-	
+
 	if now-last > h.window.Nanoseconds() {
 		h.mu.Lock()
 		if h.lastReset.Load() == last {
@@ -68,21 +78,28 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		}
 		h.mu.Unlock()
 	}
-	
+
 	hash := h.hasher.Hash(r)
-	
+
 	h.mu.RLock()
 	seen := h.filter.Test(hash)
 	h.mu.RUnlock()
-	
+
 	if seen {
+		if h.onDrop != nil {
+			h.onDrop(ctx, r)
+		}
 		return nil
 	}
-	
+
 	h.mu.Lock()
 	h.filter.Add(hash)
 	h.mu.Unlock()
-	
+
+	if h.onKeep != nil {
+		h.onKeep(ctx, r)
+	}
+
 	return h.next.Handle(ctx, r)
 }
 

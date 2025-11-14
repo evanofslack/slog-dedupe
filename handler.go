@@ -19,12 +19,13 @@ type Filter interface {
 }
 
 type Handler struct {
+	mu        sync.RWMutex
 	next      slog.Handler
 	filter    Filter
 	hasher    Hasher
 	window    time.Duration
 	lastReset atomic.Int64
-	mu        sync.RWMutex
+	stats     *Stats
 	onKeep    func(context.Context, slog.Record)
 	onDrop    func(context.Context, slog.Record)
 }
@@ -51,6 +52,12 @@ func WithOnDrop(hook func(context.Context, slog.Record)) Option {
 	return func(h *Handler) { h.onDrop = hook }
 }
 
+func WithStats() Option {
+	return func(h *Handler) {
+		h.stats = newStats()
+	}
+}
+
 // NewHandler creates new dedupe logger
 func NewHandler(handler slog.Handler, opts ...Option) *Handler {
 	h := &Handler{
@@ -75,6 +82,9 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		if h.lastReset.Load() == last {
 			h.filter.Reset()
 			h.lastReset.Store(now)
+			if h.stats != nil {
+				h.stats.incReset()
+			}
 		}
 		h.mu.Unlock()
 	}
@@ -89,6 +99,9 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		if h.onDrop != nil {
 			h.onDrop(ctx, r)
 		}
+		if h.stats != nil {
+			h.stats.incDropped()
+		}
 		return nil
 	}
 
@@ -98,6 +111,9 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 
 	if h.onKeep != nil {
 		h.onKeep(ctx, r)
+	}
+	if h.stats != nil {
+		h.stats.incKept()
 	}
 
 	return h.next.Handle(ctx, r)
@@ -125,4 +141,8 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 		window:    h.window,
 		lastReset: h.lastReset,
 	}
+}
+
+func (h *Handler) Stats() *Stats {
+	return h.stats
 }

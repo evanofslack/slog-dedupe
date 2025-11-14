@@ -8,7 +8,7 @@ import (
 )
 
 func newDedupLogger(window time.Duration) *slog.Logger {
-	return slog.New(New(slog.NewTextHandler(io.Discard, nil), WithWindow(window)))
+	return slog.New(NewHandler(slog.NewTextHandler(io.Discard, nil), WithWindow(window)))
 }
 
 func newBaselineLogger() *slog.Logger {
@@ -228,7 +228,7 @@ func BenchmarkComparison_ManyAttributes(b *testing.B) {
 }
 
 func newLoggerWithFilter(filter Filter, window time.Duration) *slog.Logger {
-	return slog.New(New(
+	return slog.New(NewHandler(
 		slog.NewTextHandler(io.Discard, nil),
 		WithWindow(window),
 		WithFilter(filter),

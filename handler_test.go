@@ -33,7 +33,7 @@ func (h *countingHandler) WithGroup(name string) slog.Handler {
 
 func TestDeduplication(t *testing.T) {
 	ch := &countingHandler{}
-	h := New(ch, WithWindow(1*time.Second))
+	h := NewHandler(ch, WithWindow(1*time.Second))
 	logger := slog.New(h)
 	
 	logger.Info("test message")
@@ -47,7 +47,7 @@ func TestDeduplication(t *testing.T) {
 
 func TestDifferentMessagesNotDeduped(t *testing.T) {
 	ch := &countingHandler{}
-	h := New(ch)
+	h := NewHandler(ch)
 	logger := slog.New(h)
 	
 	logger.Info("message 1")
@@ -61,7 +61,7 @@ func TestDifferentMessagesNotDeduped(t *testing.T) {
 
 func TestDifferentLevelsNotDeduped(t *testing.T) {
 	ch := &countingHandler{}
-	h := New(ch)
+	h := NewHandler(ch)
 	logger := slog.New(h)
 	
 	logger.Info("message")
@@ -75,7 +75,7 @@ func TestDifferentLevelsNotDeduped(t *testing.T) {
 
 func TestDifferentAttributesNotDeduped(t *testing.T) {
 	ch := &countingHandler{}
-	h := New(ch)
+	h := NewHandler(ch)
 	logger := slog.New(h)
 	
 	logger.Info("message", "key", "value1")
@@ -89,7 +89,7 @@ func TestDifferentAttributesNotDeduped(t *testing.T) {
 
 func TestWindowReset(t *testing.T) {
 	ch := &countingHandler{}
-	h := New(ch, WithWindow(100*time.Millisecond))
+	h := NewHandler(ch, WithWindow(100*time.Millisecond))
 	logger := slog.New(h)
 	
 	logger.Info("message")
@@ -103,7 +103,7 @@ func TestWindowReset(t *testing.T) {
 
 func TestWithAttrs(t *testing.T) {
 	ch := &countingHandler{}
-	h := New(ch)
+	h := NewHandler(ch)
 	logger := slog.New(h).With("global", "value")
 	
 	logger.Info("message")
@@ -116,7 +116,7 @@ func TestWithAttrs(t *testing.T) {
 
 func TestWithGroup(t *testing.T) {
 	ch := &countingHandler{}
-	h := New(ch)
+	h := NewHandler(ch)
 	logger := slog.New(h).WithGroup("group")
 	
 	logger.Info("message", "key", "value")
@@ -129,7 +129,7 @@ func TestWithGroup(t *testing.T) {
 
 func TestConcurrentLogging(t *testing.T) {
 	ch := &countingHandler{}
-	h := New(ch)
+	h := NewHandler(ch)
 	logger := slog.New(h)
 	
 	var wg sync.WaitGroup
@@ -153,7 +153,7 @@ func TestEnabled(t *testing.T) {
 	base := slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
 		Level: slog.LevelWarn,
 	})
-	h := New(base)
+	h := NewHandler(base)
 	
 	if h.Enabled(context.Background(), slog.LevelInfo) {
 		t.Error("expected Info to be disabled")
@@ -172,7 +172,7 @@ func BenchmarkBaseline(b *testing.B) {
 }
 
 func BenchmarkDedup(b *testing.B) {
-	h := New(slog.NewTextHandler(io.Discard, nil))
+	h := NewHandler(slog.NewTextHandler(io.Discard, nil))
 	logger := slog.New(h)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -181,7 +181,7 @@ func BenchmarkDedup(b *testing.B) {
 }
 
 func BenchmarkDedupUnique(b *testing.B) {
-	h := New(slog.NewTextHandler(io.Discard, nil))
+	h := NewHandler(slog.NewTextHandler(io.Discard, nil))
 	logger := slog.New(h)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -190,7 +190,7 @@ func BenchmarkDedupUnique(b *testing.B) {
 }
 
 func BenchmarkDedupManyAttrs(b *testing.B) {
-	h := New(slog.NewTextHandler(io.Discard, nil))
+	h := NewHandler(slog.NewTextHandler(io.Discard, nil))
 	logger := slog.New(h)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -201,7 +201,7 @@ func BenchmarkDedupManyAttrs(b *testing.B) {
 }
 
 func BenchmarkDedupConcurrent(b *testing.B) {
-	h := New(slog.NewTextHandler(io.Discard, nil))
+	h := NewHandler(slog.NewTextHandler(io.Discard, nil))
 	logger := slog.New(h)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {

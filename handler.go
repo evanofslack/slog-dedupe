@@ -9,7 +9,7 @@ import (
 )
 
 type Hasher interface {
-	Hash(r slog.Record) uint64
+	Hash([]byte) uint64
 }
 
 type Filter interface {
@@ -23,6 +23,7 @@ type Handler struct {
 	next      slog.Handler
 	filter    Filter
 	hasher    Hasher
+	matcher   Matcher
 	window    time.Duration
 	lastReset atomic.Int64
 	stats     *Stats
@@ -38,6 +39,10 @@ func WithFilter(f Filter) Option {
 
 func WithHasher(hs Hasher) Option {
 	return func(h *Handler) { h.hasher = hs }
+}
+
+func WithMatcher(m Matcher) Option {
+	return func(h *Handler) { h.matcher = m }
 }
 
 func WithWindow(d time.Duration) Option {
@@ -61,10 +66,11 @@ func WithStats() Option {
 // NewHandler creates new dedupe logger
 func NewHandler(handler slog.Handler, opts ...Option) *Handler {
 	h := &Handler{
-		next:   handler,
-		filter: NewBloomFilter(),
-		hasher: NewDefaultHasher(),
-		window: 5 * time.Second,
+		next:    handler,
+		filter:  NewBloomFilter(),
+		hasher:  NewDefaultHasher(),
+		matcher: MatchByLevelMessageAndAttrs(),
+		window:  60 * time.Second,
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -89,7 +95,8 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		h.mu.Unlock()
 	}
 
-	hash := h.hasher.Hash(r)
+	data := h.matcher(r)
+	hash := h.hasher.Hash(data)
 
 	h.mu.RLock()
 	seen := h.filter.Test(hash)
@@ -128,6 +135,7 @@ func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		next:      h.next.WithAttrs(attrs),
 		filter:    h.filter,
 		hasher:    h.hasher,
+		matcher:   h.matcher,
 		window:    h.window,
 		lastReset: h.lastReset,
 	}
@@ -138,6 +146,7 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 		next:      h.next.WithGroup(name),
 		filter:    h.filter,
 		hasher:    h.hasher,
+		matcher:   h.matcher,
 		window:    h.window,
 		lastReset: h.lastReset,
 	}
